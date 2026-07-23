@@ -32,9 +32,11 @@ RUN rm /opt && mkdir /opt
 # ---------------------------------------------------------------
 RUN set -eux; \
     OS_VERSION="$(. /etc/os-release && echo "${VERSION_ID}")"; \
-    sed "s/%OS_VERSION%/${OS_VERSION}/g" /lionheartp-Hyprland.repo.in > /etc/yum.repos.d/lionheartp-Hyprland.repo; \
+    BASE_ARCH="$(uname -m)"; \
+    sed -e "s/%OS_VERSION%/${OS_VERSION}/g" -e "s/%BASEARCH%/${BASE_ARCH}/g" \
+        /lionheartp-Hyprland.repo.in > /etc/yum.repos.d/lionheartp-Hyprland.repo; \
     rm /lionheartp-Hyprland.repo.in; \
-    head -5 /etc/yum.repos.d/lionheartp-Hyprland.repo
+    cat /etc/yum.repos.d/lionheartp-Hyprland.repo
 
 ### === Phase 1: Base system tweaks (MangoWM, Noctalia, desktop tools) ===
 RUN --mount=type=cache,dst=/var/cache \

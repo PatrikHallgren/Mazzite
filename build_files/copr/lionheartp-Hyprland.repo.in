@@ -1,6 +1,6 @@
 [lionheartp-Hyprland]
 name=Copr repo for lionheartp-Hyprland
-baseurl=https://download.copr.fedorainfracloud.org/results/lionheartp/Hyprland/fedora-%OS_VERSION%/$basearch/
+baseurl=https://download.copr.fedorainfracloud.org/results/lionheartp/Hyprland/fedora-%OS_VERSION%-%BASEARCH%/
 enabled=1
 gpgcheck=1
 gpgkey=https://download.copr.fedorainfracloud.org/results/lionheartp/Hyprland/pubkey.gpg
