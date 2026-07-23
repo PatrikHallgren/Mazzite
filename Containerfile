@@ -11,7 +11,7 @@ FROM scratch AS ctx
 COPY build_files /
 # COPR repo for noctalia-git. Fedora version is filled in at build
 # time from /etc/os-release via the sed below.
-COPY build_files/copr/lionheartp-Hyprland.repo /lionheartp-Hyprland.repo.in
+COPY build_files/copr/lionheartp-Hyprland.repo.in /lionheartp-Hyprland.repo.in
 
 # Main stage: the actual OS image
 FROM ${BASE_IMAGE}
