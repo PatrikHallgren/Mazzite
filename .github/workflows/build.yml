@@ -111,6 +111,12 @@ jobs:
       # Cosign key + password are required to sign the image. The
       # SIGNING_SECRET is the contents of cosign.key (a sigstore
       # private key), not a base64-encoded version.
+      - name: Install cosign
+        if: github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+        with:
+          cosign-release: 'v2.6.3'
+
       - name: Import cosign private key
         if: github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
         run: |
@@ -118,26 +124,45 @@ jobs:
           echo "${{ secrets.SIGNING_SECRET }}" > ~/.local/share/cosign/cosign.key
           chmod 600 ~/.local/share/cosign/cosign.key
 
-      # Push image + signatures to GHCR.
+      # Push image (plain podman push, no GPG signing).
+      # We do cosign signing as a separate step below.
       - name: Push image
         if: github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+        id: push-image
         run: |
           set -euxo pipefail
-          export COSIGN_PASSWORD=""
 
           # Push variant tag
-          sudo podman push --sign-by cosign \
+          sudo podman push --digestfile=/tmp/digestfile \
             ${IMAGE_NAME}:${VARIANT} \
             ${REGISTRY}/${IMAGE_NAME}:${VARIANT}
+          DIGEST=$(cat /tmp/digestfile)
 
           # Push date tag
-          sudo podman push --sign-by cosign \
+          sudo podman push \
             ${IMAGE_NAME}:${DATE_TAG} \
             ${REGISTRY}/${IMAGE_NAME}:${DATE_TAG}
 
           # Also push `latest` for the stable variant
           if [ "${VARIANT}" = "stable" ]; then
-            sudo podman push --sign-by cosign \
+            sudo podman push \
               ${IMAGE_NAME}:latest \
               ${REGISTRY}/${IMAGE_NAME}:latest
           fi
+
+          echo "digest=${DIGEST}" >> "$GITHUB_OUTPUT"
+          echo "Pushed ${REGISTRY}/${IMAGE_NAME}@${DIGEST}"
+
+      # Cosign sign. The key is passed as an env var to keep it out
+      # of the filesystem. COSIGN_PASSWORD is empty (the key was
+      # generated with an empty passphrase, matching the UBlueOS key).
+      - name: Sign container image
+        if: github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+        env:
+          COSIGN_EXPERIMENTAL: "false"
+          COSIGN_PASSWORD: ""
+          COSIGN_PRIVATE_KEY: ${{ secrets.SIGNING_SECRET }}
+        run: |
+          cosign sign -y \
+            --key env://COSIGN_PRIVATE_KEY \
+            ${REGISTRY}/${IMAGE_NAME}@${{ steps.push-image.outputs.digest }}
