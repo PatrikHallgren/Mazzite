@@ -111,6 +111,11 @@ jobs:
       # Cosign key + password are required to sign the image. The
       # SIGNING_SECRET is the contents of cosign.key (a sigstore
       # private key), not a base64-encoded version.
+      # We write the key to a file (NOT pass as env var) because
+      # cosign v2.x has trouble parsing the multi-line PEM key when
+      # it comes through env://COSIGN_PRIVATE_KEY. With a file path,
+      # cosign reads the key directly and there's no escape/encoding
+      # issue.
       - name: Install cosign
         if: github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
         uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
@@ -121,8 +126,19 @@ jobs:
         if: github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
         run: |
           mkdir -p ~/.local/share/cosign
-          echo "${{ secrets.SIGNING_SECRET }}" > ~/.local/share/cosign/cosign.key
+          printf '%s' "${{ secrets.SIGNING_SECRET }}" > ~/.local/share/cosign/cosign.key
+          # The printf above preserves newlines exactly. If the
+          # secret doesn't end with a newline (which it doesn't —
+          # the cosign.key file ends with '-----END...KEY-----\n'),
+          # we add one to make PEM parsers happy.
+          if [ "$(tail -c1 ~/.local/share/cosign/cosign.key | wc -l)" -eq 0 ]; then
+            echo "" >> ~/.local/share/cosign/cosign.key
+          fi
           chmod 600 ~/.local/share/cosign/cosign.key
+          # Sanity-check the key file
+          head -1 ~/.local/share/cosign/cosign.key
+          tail -1 ~/.local/share/cosign/cosign.key
+          file ~/.local/share/cosign/cosign.key
 
       # Push image (plain podman push, no GPG signing).
       # We do cosign signing as a separate step below.
@@ -153,16 +169,14 @@ jobs:
           echo "digest=${DIGEST}" >> "$GITHUB_OUTPUT"
           echo "Pushed ${REGISTRY}/${IMAGE_NAME}@${DIGEST}"
 
-      # Cosign sign. The key is passed as an env var to keep it out
-      # of the filesystem. COSIGN_PASSWORD is empty (the key was
-      # generated with an empty passphrase, matching the UBlueOS key).
+      # Cosign sign. Uses the key file written by 'Import cosign
+      # private key'. cosign is invoked as the runner user (no
+      # sudo needed) and reads the key from the file path.
       - name: Sign container image
         if: github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
         env:
-          COSIGN_EXPERIMENTAL: "false"
           COSIGN_PASSWORD: ""
-          COSIGN_PRIVATE_KEY: ${{ secrets.SIGNING_SECRET }}
         run: |
           cosign sign -y \
-            --key env://COSIGN_PRIVATE_KEY \
+            --key ~/.local/share/cosign/cosign.key \
             ${REGISTRY}/${IMAGE_NAME}@${{ steps.push-image.outputs.digest }}
