@@ -6,6 +6,10 @@ Documentation=https://docs.noctalia.dev/v5/
 # so the unit only fires when the user actually picked our session —
 # it will NOT fire in the default Bazzite (KDE/Plasma/GNOME) session.
 ConditionEnvironment=XDG_SESSION_DESKTOP=mangowm-noctalia
+# Belt-and-suspenders: only run inside a Wayland session.
+# (ConditionEnvironment is a [Unit] directive, NOT [Service]. systemd
+# v256+ silently ignores it in [Service] and warns at parse time.)
+ConditionEnvironment=WAYLAND_DISPLAY
 After=graphical-session.target
 PartOf=graphical-session.target
 
@@ -14,8 +18,6 @@ Type=simple
 ExecStart=/usr/bin/noctalia
 Restart=on-failure
 RestartSec=3
-# Belt-and-suspenders: only run inside a Wayland session.
-ConditionEnvironment=WAYLAND_DISPLAY
 
 [Install]
 WantedBy=graphical-session.target
