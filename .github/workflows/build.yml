@@ -55,6 +55,13 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           registry: ghcr.io
           registry_namespace: ${{ github.repository_owner }}
+          # Override the action's default of `github.repository_owner` for
+          # the source pull. The base image (ghcr.io/ublue-os/bazzite-nvidia)
+          # is public; if we pass PatrikHallgren, the CLI tries to use
+          # GITHUB_TOKEN auth which fails because we are not a member of
+          # the ublue-os org. Empty username -> CLI falls back to
+          # anonymous pull for the source image, which GHCR allows.
+          registry_username: ""
           # PR context (required by the action even on push).
           pr_event_number: ${{ github.event.pull_request.number || 0 }}
           # Maximise free disk on the runner before build.
