@@ -1,8 +1,8 @@
-name: build
+name: Build Mazzite image
 
-# Trigger the build on push to main, on PRs (validation), manually via
-# workflow_dispatch, and on a daily cron at 10:30 UTC so the image
-# picks up Bazzite base updates even when no commit has landed.
+# Build on push to main, on PRs (validation), manually, and on a daily
+# cron at 10:30 UTC so the image picks up Bazzite base updates even
+# when no commit has landed.
 on:
   push:
     branches:
@@ -18,51 +18,109 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref || github.run_id }}
   cancel-in-progress: true
 
-jobs:
-  build:
-    name: Build & sign (${{ matrix.recipe }})
-    runs-on: ubuntu-24.04
+env:
+  IMAGE_REGISTRY: "ghcr.io/${{ github.repository_owner }}"  # do not edit
 
-    # GITHUB_TOKEN needs packages:write to push the built image to GHCR.
-    # Without this, the final `bootc push` step fails with a 403.
-    permissions:
-      contents: read
-      packages: write
+jobs:
+  build_push:
+    name: Build ${{ matrix.variant.name }}
+    runs-on: ubuntu-24.04
 
     strategy:
       fail-fast: false
       matrix:
-        # One job per recipe in /recipes. We start with just `recipe.yml`
-        # but this makes it trivial to add stable-nvidia or nvidia-open
-        # variants later by adding a second recipe file.
-        recipe:
-          - recipe.yml
+        # Start with just one variant: bazzite-nvidia:stable.
+        # Add stable-nvidia (for bazzite-dx-nvidia) or others later
+        # by appending to this list.
+        variant:
+          - name: stable
+            base_image: ghcr.io/ublue-os/bazzite-nvidia:stable
+
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
 
     steps:
-      - name: Check out the repo
-        uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
 
-      - name: Free up build-host space
+      - name: Maximize build space
+        uses: ublue-os/remove-unwanted-software@695eb75bc387dbcd9685a8e72d23439d8686cba6
+
+      - name: Set image metadata
+        id: meta
         run: |
-          sudo rm -rf /usr/local/lib/android /opt/ghc \
-                      /usr/lib/dotnet /opt/microsoft /opt/mssql-tools
+          REGISTRY="${IMAGE_REGISTRY,,}"
+          NAME="mazzite"
+          VARIANT="${{ matrix.variant.name }}"
+          DATE_TAG="${VARIANT}-$(date -u +%Y%m%d)"
 
-      - name: Build image with BlueBuild
-        uses: blue-build/github-action@v1
+          echo "REGISTRY=${REGISTRY}" >> $GITHUB_ENV
+          echo "IMAGE_NAME=${NAME}" >> $GITHUB_ENV
+          echo "VARIANT=${VARIANT}" >> $GITHUB_ENV
+          echo "DATE_TAG=${DATE_TAG}" >> $GITHUB_ENV
+
+      - name: Build image
+        id: build
+        run: |
+          sudo podman build \
+            --build-arg BASE_IMAGE=${{ matrix.variant.base_image }} \
+            --label="containers.bootc=1" \
+            -t ${IMAGE_NAME}:${VARIANT} \
+            .
+
+      # Rechunk for smaller delta updates. Best-effort — rechunking is
+      # still being upstreamed in Bluefin/Bazzite and may fail on some
+      # versions. continue-on-error so a failed rechunk doesn't fail
+      # the whole build.
+      - name: Rechunk with rpm-ostree
+        id: rechunk
+        continue-on-error: true
+        run: |
+          sudo dnf install -y rpm-ostree
+          sudo rpm-ostree cli rechunk ${IMAGE_NAME}:${VARIANT}
+
+      - name: Tag image
+        id: tag
+        run: |
+          sudo podman tag ${IMAGE_NAME}:${VARIANT} ${IMAGE_NAME}:${DATE_TAG}
+          if [ "${VARIANT}" = "stable" ]; then
+            sudo podman tag ${IMAGE_NAME}:${VARIANT} ${IMAGE_NAME}:latest
+          fi
+
+      # Log in to GHCR. Only on main + schedule; PRs do a dry run.
+      - name: Log in to GitHub Container Registry
+        if: github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
         with:
-          # The `recipe:` input is RELATIVE to the `recipes/` directory.
-          # The action internally prepends `recipes/` to whatever you pass.
-          # Pass just the filename so the resolved path is `recipes/recipe.yml`.
-          # The cosign public key is expected to be at the repo root as
-          # `cosign.pub` (we ship it for verifier convenience).
-          recipe: ${{ matrix.recipe }}
-          cosign_private_key: ${{ secrets.SIGNING_SECRET }}
-          # Push to GHCR on main + schedule; dry-run on PRs.
-          push: ${{ github.event_name != 'pull_request' }}
           registry: ghcr.io
-          registry_namespace: ${{ github.repository_owner }}
-          registry_token: ${{ secrets.GITHUB_TOKEN }}
-          # PR context (required by the action even on push).
-          pr_event_number: ${{ github.event.pull_request.number || 0 }}
-          # Maximise free disk on the runner before build.
-          maximize_build_space: true
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Cosign key + password are required to sign the image. The
+      # SIGNING_SECRET is the contents of cosign.key (a sigstore
+      # private key), not a base64-encoded version.
+      - name: Import cosign private key
+        if: github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+        run: |
+          echo "${{ secrets.SIGNING_SECRET }}" > /tmp/cosign.key
+          chmod 600 /tmp/cosign.key
+
+      # Push image + signatures to GHCR.
+      - name: Push image
+        if: github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+        run: |
+          sudo podman push --sign-by cosign \
+            ${IMAGE_NAME}:${VARIANT} \
+            ${REGISTRY}/${IMAGE_NAME}:${VARIANT}
+          sudo podman push --sign-by cosign \
+            ${IMAGE_NAME}:${DATE_TAG} \
+            ${REGISTRY}/${IMAGE_NAME}:${DATE_TAG}
+          if [ "${VARIANT}" = "stable" ]; then
+            sudo podman push --sign-by cosign \
+              ${IMAGE_NAME}:latest \
+              ${REGISTRY}/${IMAGE_NAME}:latest
+          fi
+        env:
+          COSIGN_PASSWORD: ""

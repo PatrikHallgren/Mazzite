@@ -4,6 +4,7 @@ output/
 *.tar
 *.qcow2
 *.iso
+rechunk/
 
 # Cosign
 cosign.key
@@ -19,8 +20,3 @@ cosign.key
 .DS_Store
 .idea/
 .vscode/
-
-# Python (BlueBuild CLI cache)
-__pycache__/
-*.pyc
-.bluebuild-cache/
