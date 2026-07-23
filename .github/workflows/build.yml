@@ -90,7 +90,12 @@ jobs:
           fi
 
       # Log in to GHCR. Only on main + schedule; PRs do a dry run.
-      - name: Log in to GitHub Container Registry
+      # Two steps: docker/login-action (for buildah/scosign) AND a
+      # separate podman login (for the push step which uses sudo).
+      # The Docker login stores creds in $HOME/.docker/config.json;
+      # podman running under sudo doesn't see that, so we pipe the
+      # token to podman login directly.
+      - name: Log in to GitHub Container Registry (docker)
         if: github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
         uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
         with:
@@ -98,29 +103,41 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Podman login to GHCR
+        if: github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | sudo podman login ghcr.io -u ${{ github.actor }} --password-stdin
+
       # Cosign key + password are required to sign the image. The
       # SIGNING_SECRET is the contents of cosign.key (a sigstore
       # private key), not a base64-encoded version.
       - name: Import cosign private key
         if: github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
         run: |
-          echo "${{ secrets.SIGNING_SECRET }}" > /tmp/cosign.key
-          chmod 600 /tmp/cosign.key
+          mkdir -p ~/.local/share/cosign
+          echo "${{ secrets.SIGNING_SECRET }}" > ~/.local/share/cosign/cosign.key
+          chmod 600 ~/.local/share/cosign/cosign.key
 
       # Push image + signatures to GHCR.
       - name: Push image
         if: github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
         run: |
+          set -euxo pipefail
+          export COSIGN_PASSWORD=""
+
+          # Push variant tag
           sudo podman push --sign-by cosign \
             ${IMAGE_NAME}:${VARIANT} \
             ${REGISTRY}/${IMAGE_NAME}:${VARIANT}
+
+          # Push date tag
           sudo podman push --sign-by cosign \
             ${IMAGE_NAME}:${DATE_TAG} \
             ${REGISTRY}/${IMAGE_NAME}:${DATE_TAG}
+
+          # Also push `latest` for the stable variant
           if [ "${VARIANT}" = "stable" ]; then
             sudo podman push --sign-by cosign \
               ${IMAGE_NAME}:latest \
               ${REGISTRY}/${IMAGE_NAME}:latest
           fi
-        env:
-          COSIGN_PASSWORD: ""
