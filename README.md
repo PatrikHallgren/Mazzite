@@ -45,6 +45,8 @@ Mazzite/
 │           ├── mangowm-noctalia.desktop    # SDDM session entry
 │           └── mango-session.sh            # session wrapper
 ├── Justfile                                # local build recipes
+├── VERIFY.md                               # cosign verification how-to
+├── cosign.pub                              # public signing key (NOT a secret)
 └── README.md
 ```
 
@@ -73,9 +75,12 @@ from the `ublue-custom-images` skill for the diagnostic transcript.
 
 ## Signing
 
-Images are cosign-signed. The CI consumes the `SIGNING_SECRET` GitHub Action
-secret. To verify locally:
+Images are cosign-signed. The CI consumes the `SIGNING_SECRET` GitHub
+Action secret. To verify locally:
 
 ```
 cosign verify --key cosign.pub ghcr.io/patrikhallgren/mazzite:stable
 ```
+
+The same key pair is used for UBlueOS and Mazzite. See `VERIFY.md` for
+the rotation procedure and rationale.
