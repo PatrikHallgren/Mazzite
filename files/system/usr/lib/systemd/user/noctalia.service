@@ -1,0 +1,21 @@
+[Unit]
+Description=Noctalia v5 desktop shell (Mazzite)
+Documentation=https://docs.noctalia.dev/v5/
+# Gate the unit on the Mazzite MangoWM session. SDDM propagates the
+# `mangowm-noctalia` value as XDG_SESSION_DESKTOP into the user session,
+# so the unit only fires when the user actually picked our session —
+# it will NOT fire in the default Bazzite (KDE/Plasma/GNOME) session.
+ConditionEnvironment=XDG_SESSION_DESKTOP=mangowm-noctalia
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/noctalia
+Restart=on-failure
+RestartSec=3
+# Belt-and-suspenders: only run inside a Wayland session.
+ConditionEnvironment=WAYLAND_DISPLAY
+
+[Install]
+WantedBy=graphical-session.target

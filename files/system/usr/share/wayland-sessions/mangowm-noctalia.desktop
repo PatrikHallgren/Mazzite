@@ -1,0 +1,12 @@
+[Desktop Entry]
+# Mazzite MangoWM session entry.
+# This entry appears in the SDDM greeter alongside Bazzite's default
+# session. The session wrapper script (mango-session.sh) sets up the
+# right env vars (XDG_CURRENT_DESKTOP, XDG_SESSION_DESKTOP) and the
+# noctalia.service user unit fires only when this session is active.
+Name=MangoWM (Noctalia v5)
+Comment=MangoWM tiling Wayland compositor with Noctalia v5 shell
+Exec=/usr/share/wayland-sessions/mango-session.sh
+Type=Application
+DesktopNames=MangoWM
+X-Session-Type=wayland

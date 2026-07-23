@@ -1,0 +1,26 @@
+# Build artefacts
+build/
+output/
+*.tar
+*.qcow2
+*.iso
+
+# Cosign
+cosign.key
+*.sig
+*.pem
+
+# Local config
+.env
+.envrc
+
+# Editor / OS
+*.swp
+.DS_Store
+.idea/
+.vscode/
+
+# Python (BlueBuild CLI cache)
+__pycache__/
+*.pyc
+.bluebuild-cache/

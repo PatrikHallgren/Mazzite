@@ -1,0 +1,56 @@
+name: build
+
+# Trigger the build on push to main, on PRs (validation), manually via
+# workflow_dispatch, and on a daily cron at 10:30 UTC so the image
+# picks up Bazzite base updates even when no commit has landed.
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+  schedule:
+    - cron: "30 10 * * *"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build & sign (${{ matrix.recipe }})
+    runs-on: ubuntu-24.04
+
+    strategy:
+      fail-fast: false
+      matrix:
+        # One job per recipe in /recipes. We start with just `recipe.yml`
+        # but this makes it trivial to add stable-nvidia or nvidia-open
+        # variants later by adding a second recipe file.
+        recipe:
+          - recipe.yml
+
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v4
+
+      - name: Free up build-host space
+        run: |
+          sudo rm -rf /usr/local/lib/android /opt/ghc \
+                      /usr/lib/dotnet /opt/microsoft /opt/mssql-tools
+
+      - name: Build image with BlueBuild
+        uses: blue-build/github-action@v1
+        with:
+          recipe: recipes/${{ matrix.recipe }}
+          cosign_private_key: ${{ secrets.SIGNING_SECRET }}
+          # Push to GHCR on main + schedule; dry-run on PRs.
+          push: ${{ github.event_name != 'pull_request' }}
+          registry: ghcr.io
+          registry_namespace: ${{ github.repository_owner }}
+          # PR context (required by the action even on push).
+          pr_event_number: ${{ github.event.pull_request.number || 0 }}
+          # Maximise free disk on the runner before build.
+          maximize_build_space: true

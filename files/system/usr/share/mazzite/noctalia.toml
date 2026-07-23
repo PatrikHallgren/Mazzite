@@ -1,0 +1,38 @@
+# Mazzite — default Noctalia v5 configuration.
+# Seeded to ~/.config/noctalia/config.toml on first Mazzite MangoWM login.
+# Edit your own copy; the system copy at /usr/share/mazzite/noctalia.toml
+# is the seed only.
+#
+# Noctalia v5 config is TOML. Reference: https://docs.noctalia.dev/v5/
+
+[shell]
+# Force-on widgets we want visible from day one.
+dateFormat = "ddd d MMM"
+use24h = true
+
+[bar]
+position = "top"
+height = 32
+opacity = 0.85
+
+[launcher]
+# Use fuzzel as a fallback if noctalia's own launcher ever crashes.
+# (Noctalia's launcher is preferred; the fuzzel fallback lives behind
+#  Mango's Super+E keybind.)
+enableFuzzelFallback = false
+
+[controlCenter]
+# Cmd-on-Toggle puts settings on the right side of the bar.
+position = "right"
+enableBrightness = true
+enableVolume = true
+
+[wallpaper]
+mode = "static"          # 'static' | 'slideshow' | 'shader'
+slideshowDir = "~/Pictures/Wallpapers"
+slideshowInterval = 300  # seconds
+
+[theme]
+accent = "#ebdbb2"       # Gruvbox light
+background = "#1d2021"   # Gruvbox dark
+foreground = "#ebdbb2"
