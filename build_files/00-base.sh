@@ -43,6 +43,7 @@ dnf5 -y install noctalia-git libwebp hicolor-icon-theme dejavu-sans-fonts
 # Desktop tooling — fills gaps Noctalia doesn't cover
 # ------------------------------------------------------------------
 dnf5 -y install \
+  foot                 `# Wayland terminal (Super+Enter; also used by drop-down scratchpad)` \
   fuzzel               `# app launcher (fallback to Noctalia)` \
   wl-clipboard         `# wl-copy / wl-paste` \
   swayidle swaylock    `# idle daemon + screen locker` \
