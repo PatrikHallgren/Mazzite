@@ -23,6 +23,12 @@ jobs:
     name: Build & sign (${{ matrix.recipe }})
     runs-on: ubuntu-24.04
 
+    # GITHUB_TOKEN needs packages:write to push the built image to GHCR.
+    # Without this, the final `bootc push` step fails with a 403.
+    permissions:
+      contents: read
+      packages: write
+
     strategy:
       fail-fast: false
       matrix:
@@ -41,6 +47,23 @@ jobs:
           sudo rm -rf /usr/local/lib/android /opt/ghc \
                       /usr/lib/dotnet /opt/microsoft /opt/mssql-tools
 
+      # Log in to ghcr.io BEFORE the BlueBuild action. The bluebuild CLI
+      # reads its registry credentials from the Docker credential store
+      # first, then falls back to GITHUB_ACTOR + GITHUB_TOKEN if no Docker
+      # creds are present. The GITHUB_TOKEN fallback uses PatrikHallgren
+      # which has no read:packages access on the ublue-os org's images
+      # (bazzite-nvidia, etc.), so the source pull fails with
+      # "Not authorized". Logging in via docker/login-action first stores
+      # creds in ~/.docker/config.json, which the bluebuild CLI then
+      # picks up — and the GITHUB_TOKEN is sufficient to read public
+      # images once the CLI uses it.
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Build image with BlueBuild
         uses: blue-build/github-action@v1
         with:
@@ -55,13 +78,6 @@ jobs:
           push: ${{ github.event_name != 'pull_request' }}
           registry: ghcr.io
           registry_namespace: ${{ github.repository_owner }}
-          # Override the action's default of `github.repository_owner` for
-          # the source pull. The base image (ghcr.io/ublue-os/bazzite-nvidia)
-          # is public; if we pass PatrikHallgren, the CLI tries to use
-          # GITHUB_TOKEN auth which fails because we are not a member of
-          # the ublue-os org. Empty username -> CLI falls back to
-          # anonymous pull for the source image, which GHCR allows.
-          registry_username: ""
           # PR context (required by the action even on push).
           pr_event_number: ${{ github.event.pull_request.number || 0 }}
           # Maximise free disk on the runner before build.
