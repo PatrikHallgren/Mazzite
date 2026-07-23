@@ -44,7 +44,12 @@ jobs:
       - name: Build image with BlueBuild
         uses: blue-build/github-action@v1
         with:
-          recipe: recipes/${{ matrix.recipe }}
+          # The `recipe:` input is RELATIVE to the `recipes/` directory.
+          # The action internally prepends `recipes/` to whatever you pass.
+          # Pass just the filename so the resolved path is `recipes/recipe.yml`.
+          # The cosign public key is expected to be at the repo root as
+          # `cosign.pub` (we ship it for verifier convenience).
+          recipe: ${{ matrix.recipe }}
           cosign_private_key: ${{ secrets.SIGNING_SECRET }}
           # Push to GHCR on main + schedule; dry-run on PRs.
           push: ${{ github.event_name != 'pull_request' }}
