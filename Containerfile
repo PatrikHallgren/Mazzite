@@ -38,6 +38,12 @@ RUN set -eux; \
     rm /lionheartp-Hyprland.repo.in; \
     cat /etc/yum.repos.d/lionheartp-Hyprland.repo
 
+### === System files (Mango session, Noctalia service, default configs) ===
+# These are placed in their final paths at build time and persist
+# into the bootc image. Done BEFORE the build scripts run so the
+# scripts can sanity-check them.
+COPY system_files /
+
 ### === Phase 1: Base system tweaks (MangoWM, Noctalia, desktop tools) ===
 RUN --mount=type=cache,dst=/var/cache \
     --mount=type=cache,dst=/var/log \
@@ -55,11 +61,6 @@ RUN --mount=type=cache,dst=/var/cache \
     --mount=type=cache,dst=/var/log \
     --mount=type=tmpfs,dst=/tmp \
     /20-cleanup.sh
-
-### === System files (Mango session, Noctalia service, default configs) ===
-# These are placed in their final paths at build time and persist
-# into the bootc image.
-COPY system_files /
 
 ### === Final bootc lint ===
 RUN bootc container lint || true
