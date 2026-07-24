@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # Mazzite — MangoWM session wrapper
 #
-# Launched by SDDM when the user picks "MangoWM (Noctalia v5)" at the
-# greeter. SDDM exports XDG_SESSION_DESKTOP=mangowm-noctalia into the
-# session, which is what the noctalia.service user unit keys off of to
-# decide whether to start.
+# Launched by SDDM (Bazzite's plasmalogin) when the user picks
+# "MangoWM (Noctalia v5)" at the greeter. Plasmalogin takes
+# XDG_SESSION_DESKTOP from the `DesktopNames=` field of the .desktop
+# file, not the filename, so it exports XDG_SESSION_DESKTOP=MangoWM
+# for our session. The noctalia.service user unit gates on that value.
 #
 # Responsibilities:
 #   1. Pre-flight check that `mango` binary exists.
