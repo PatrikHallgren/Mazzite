@@ -16,6 +16,7 @@ set -euxo pipefail
 test -f /usr/share/wayland-sessions/mangowm-noctalia.desktop
 test -x /usr/share/wayland-sessions/mango-session.sh
 test -f /usr/lib/systemd/user/noctalia.service
+test -f /usr/lib/systemd/user/mazzite-session.service
 
 # First-login seed helper (seeds ~/.config/{mango,noctalia}/ on
 # first Mango session start). Marked executable.

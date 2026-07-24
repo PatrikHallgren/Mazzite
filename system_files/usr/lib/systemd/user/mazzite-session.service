@@ -1,0 +1,18 @@
+[Unit]
+Description=Mazzite (Mango+Noctalia) user session anchor
+Documentation=https://github.com/PatrikHallgren/Mazzite
+# Anchors the Mazzite session to graphical-session.target. Mango's
+# session wrapper script (mango-session.sh) starts this unit; because
+# we Want= the target, the target becomes active and any user unit
+# with WantedBy=graphical-session.target (e.g. noctalia.service) gets
+# pulled in. Without this anchor, graphical-session.target never
+# reaches active state under Mango — it's a "refuse manual start"
+# target, so something must depend on it. Mango's compositor process
+# alone does not.
+Wants=graphical-session.target
+After=graphical-session.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/true

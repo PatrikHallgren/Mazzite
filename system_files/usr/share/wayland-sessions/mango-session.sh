@@ -52,6 +52,17 @@ if command -v systemctl >/dev/null 2>&1; then
         WAYLAND_DISPLAY || true
 fi
 
+# Activate graphical-session.target so any user unit with
+# WantedBy=graphical-session.target (e.g. noctalia.service) auto-starts.
+# Without this, graphical-session.target stays inactive — it's a "refuse
+# manual start" target reached only via dependency, and Mango's session
+# script is the only thing here that can pull it in. We start our own
+# mazzite-session.service (shipped in /usr/lib/systemd/user) which has
+# Wants=graphical-session.target, so the target comes up transitively.
+if command -v systemctl >/dev/null 2>&1; then
+    systemctl --user start mazzite-session.service || true
+fi
+
 if ! command -v mango >/dev/null 2>&1; then
     echo "FATAL: /usr/bin/mango not found. Did the terra-extras layer install?" >&2
     notify-send "MangoWM missing" "The mango binary is not installed." 2>/dev/null || true
