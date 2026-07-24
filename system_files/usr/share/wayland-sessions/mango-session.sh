@@ -6,6 +6,8 @@
 # XDG_SESSION_DESKTOP from the `DesktopNames=` field of the .desktop
 # file, not the filename, so it exports XDG_SESSION_DESKTOP=MangoWM
 # for our session. The noctalia.service user unit gates on that value.
+# This script also `import-environment`s the relevant vars into the user
+# systemd manager — see the block below before `exec /usr/bin/mango`.
 #
 # Responsibilities:
 #   1. Pre-flight check that `mango` binary exists.
@@ -30,9 +32,25 @@ echo "    XDG_SESSION_DESKTOP=${XDG_SESSION_DESKTOP:-unset}"
 # MangoWM expects these; SDDM usually sets them but be defensive.
 export XDG_SESSION_TYPE=wayland
 export XDG_CURRENT_DESKTOP=MangoWM
-# XDG_SESSION_DESKTOP comes from SDDM as "mangowm-noctalia" — keep it
-# (don't override), it's what gates noctalia.service.
+# XDG_SESSION_DESKTOP comes from SDDM as "MangoWM" (DesktopNames= field in
+# mangowm-noctalia.desktop). Keep it — it's what gates noctalia.service.
 export DESKTOP_SESSION="${XDG_SESSION_DESKTOP:-mangowm-noctalia}"
+
+# Push the session-identifying vars into the user systemd manager's
+# environment. The user manager was spawned by PAM/plasmalogin before
+# this script ran and has its env frozen at that point — without these
+# imports, ConditionEnvironment= in noctalia.service evaluates against
+# a manager env that has no XDG_SESSION_DESKTOP, and the gate silently
+# fails (no journal entry, unit never even attempted). WAYLAND_DISPLAY
+# is included so the unit's second gate also sees the right value.
+if command -v systemctl >/dev/null 2>&1; then
+    systemctl --user import-environment \
+        XDG_SESSION_DESKTOP \
+        XDG_CURRENT_DESKTOP \
+        DESKTOP_SESSION \
+        XDG_SESSION_TYPE \
+        WAYLAND_DISPLAY || true
+fi
 
 if ! command -v mango >/dev/null 2>&1; then
     echo "FATAL: /usr/bin/mango not found. Did the terra-extras layer install?" >&2
