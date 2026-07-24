@@ -8,11 +8,15 @@ Documentation=https://docs.noctalia.dev/v5/
 # that arrives in the user session is `MangoWM`, not `mangowm-noctalia`.
 # Use that value here so the unit fires when the user picks our session
 # — and does NOT fire in the default Bazzite (KDE/Plasma/GNOME) session.
+#
+# We do NOT additionally gate on WAYLAND_DISPLAY here. Plasmalogin
+# doesn't reliably propagate WAYLAND_DISPLAY into the user manager at
+# the moment of evaluation, so the gate fails intermittently with
+# "unmet condition check ConditionEnvironment=WAYLAND_DISPLAY" even
+# though the var is present shortly after. XDG_SESSION_DESKTOP=MangoWM
+# is the real discriminator, and `WantedBy=graphical-session.target` +
+# mazzite-session.service activating the target handle the timing.
 ConditionEnvironment=XDG_SESSION_DESKTOP=MangoWM
-# Belt-and-suspenders: only run inside a Wayland session.
-# (ConditionEnvironment is a [Unit] directive, NOT [Service]. systemd
-# v256+ silently ignores it in [Service] and warns at parse time.)
-ConditionEnvironment=WAYLAND_DISPLAY
 After=graphical-session.target
 PartOf=graphical-session.target
 
